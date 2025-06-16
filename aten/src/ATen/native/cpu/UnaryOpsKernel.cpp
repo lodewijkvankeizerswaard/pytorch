@@ -449,6 +449,7 @@ static void polygamma_kernel(TensorIteratorBase& iter, int64_t n) {
 template <typename scalar_t>
 inline scalar_t _nan_to_num_replace(
     scalar_t a, scalar_t nan_replacement, scalar_t pos_inf_replacement, scalar_t neg_inf_replacement) {
+      std::cout << "scalar_t _nan_to_num_replace " << a << std::endl;
   if (at::_isnan(a)) {
     return nan_replacement;
   } else if (a == std::numeric_limits<scalar_t>::infinity()) {
@@ -463,6 +464,8 @@ inline scalar_t _nan_to_num_replace(
 template <typename scalar_t>
 inline c10::complex<scalar_t> _nan_to_num_replace(
     c10::complex<scalar_t> a, scalar_t nan, scalar_t posinf, scalar_t neginf) {
+      std::cout << "complex _nan_to_num_replace" << a << std::endl;
+      
   return c10::complex<scalar_t>(
       _nan_to_num_replace(a.real(), nan, posinf, neginf),
       _nan_to_num_replace(a.imag(), nan, posinf, neginf)
@@ -470,8 +473,20 @@ inline c10::complex<scalar_t> _nan_to_num_replace(
 }
 
 template <typename scalar_t>
+inline c10::complex<scalar_t> _nan_to_num_replace(
+    c10::complex<scalar_t> a, c10::complex<scalar_t> nan, c10::complex<scalar_t> posinf, c10::complex<scalar_t> neginf) {
+      std::cout << "complex _nan_to_num_replace" << a << std::endl;
+      
+  return c10::complex<scalar_t>(
+      _nan_to_num_replace(a.real(), nan.real(), posinf.real(), neginf.real()),
+      _nan_to_num_replace(a.imag(), nan.imag(), posinf.imag(), neginf.imag())
+  );
+}
+
+template <typename scalar_t>
 inline Vectorized<scalar_t> _nan_to_num_replace(
     Vectorized<scalar_t> a, scalar_t nan, scalar_t posinf, scalar_t neginf) {
+  std::cout << "Vectorized _nan_to_num_replace" << std::endl;
   using vec_t = Vectorized<scalar_t>;
   vec_t inf(std::numeric_limits<scalar_t>::infinity());
   vec_t result;
@@ -484,8 +499,10 @@ template <typename scalar_t>
 inline Vectorized<c10::complex<scalar_t>> _nan_to_num_replace(
     Vectorized<c10::complex<scalar_t>> a, scalar_t nan, scalar_t posinf, scalar_t neginf) {
 #if !defined(_MSC_VER) && (defined(CPU_CAPABILITY_AVX2) || defined(CPU_CAPABILITY_AVX512))
+  std::cout << "Vectorized-complex _nan_to_num_replace (0)" << std::endl;
   return {_nan_to_num_replace(Vectorized<scalar_t>(a), nan, posinf, neginf)};
 #else
+  std::cout << "Vectorized-complex _nan_to_num_replace" << std::endl;
   __at_align__ c10::complex<scalar_t> buffer[a.size()];
   a.store(buffer);
   auto asreal = Vectorized<scalar_t>::loadu(buffer);
@@ -494,11 +511,29 @@ inline Vectorized<c10::complex<scalar_t>> _nan_to_num_replace(
 #endif
 }
 
+template <typename scalar_t>
+inline Vectorized<c10::complex<scalar_t>> _nan_to_num_replace(
+    Vectorized<c10::complex<scalar_t>> a, c10::complex<scalar_t> nan, c10::complex<scalar_t> posinf, c10::complex<scalar_t> neginf) {
+#if !defined(_MSC_VER) && (defined(CPU_CAPABILITY_AVX2) || defined(CPU_CAPABILITY_AVX512))
+  std::cout << "Vectorized-complex _nan_to_num_replace (0)" << std::endl;
+  return {_nan_to_num_replace(Vectorized<scalar_t>(a), nan, posinf, neginf)};
+#else
+  std::cout << "Vectorized-complex _nan_to_num_replace" << std::endl;
+  __at_align__ c10::complex<scalar_t> buffer[a.size()];
+  a.store(buffer);
+  auto asreal = Vectorized<scalar_t>::loadu(buffer);
+  _nan_to_num_replace(asreal, nan, posinf, neginf).store(buffer);
+  return Vectorized<c10::complex<scalar_t>>::loadu(buffer);
+#endif
+}
+
+template <typename scalar_tt>
 static void nan_to_num_kernel(
     TensorIteratorBase& iter,
-    std::optional<double> nan,
-    std::optional<double> pos_inf,
-    std::optional<double> neg_inf) {
+    std::optional<scalar_tt> nan,
+    std::optional<scalar_tt> pos_inf,
+    std::optional<scalar_tt> neg_inf) {
+    std::cout << "nan_to_num_kernel_old" << std::endl;
   AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(kBFloat16, kHalf, iter.dtype(), "nan_to_num", [&]() {
     using value_t = c10::scalar_value_type<scalar_t>::type;
     value_t nan_replacement = static_cast<value_t>(nan.value_or(0.));
@@ -511,12 +546,42 @@ static void nan_to_num_kernel(
     using vec_t = Vectorized<scalar_t>;
 
     cpu_kernel_vec(iter, [=](scalar_t a) -> scalar_t {
+
       return _nan_to_num_replace(a, nan_replacement, pos_inf_replacement, neg_inf_replacement);
     }, [=](vec_t a) -> vec_t {
       return _nan_to_num_replace(a, nan_replacement, pos_inf_replacement, neg_inf_replacement);
     });
   });
 }
+
+// static void nan_to_num_kernel(
+//     TensorIteratorBase& iter,
+//     std::optional<c10::complex<double>> nan,
+//     std::optional<c10::complex<double>> pos_inf,
+//     std::optional<c10::complex<double>> neg_inf) {
+//     std::cout << "nan_to_num_kernel_new" << std::endl;
+//   AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES_AND2(kBFloat16, kHalf, iter.dtype(), "nan_to_num", [&]() {
+//     using value_t = c10::scalar_value_type<scalar_t>::type;
+//     std::cout << typeid(value_t).name() << std::endl;
+//     std::cout << typeid(scalar_t).name() << std::endl;
+//     c10::complex<value_t> nan_replacement = c10::complex<value_t>(nan.value_or(c10::complex<double>(0., 0.)));
+//     c10::complex<value_t> pos_inf_replacement = pos_inf.has_value()
+//         ? c10::complex<value_t>(pos_inf.value())
+//         : c10::complex<value_t>(std::numeric_limits<value_t>::max());
+//     c10::complex<value_t> neg_inf_replacement = neg_inf.has_value()
+//         ? c10::complex<value_t>(neg_inf.value())
+//         : c10::complex<value_t>(std::numeric_limits<value_t>::lowest());
+
+//     using vec_t = Vectorized<scalar_t>;
+
+//     cpu_kernel_vec(iter, [=](scalar_t a) -> scalar_t {
+
+//       return _nan_to_num_replace(a, nan_replacement, pos_inf_replacement, neg_inf_replacement);
+//     }, [=](vec_t a) -> vec_t {
+//       return _nan_to_num_replace(a, nan_replacement, pos_inf_replacement, neg_inf_replacement);
+//     });
+//   });
+// }
 
 static void kaiser_window_kernel(TensorIteratorBase& iter, int64_t window_length, double beta){
   AT_DISPATCH_FLOATING_TYPES_AND2(kBFloat16, kHalf, iter.dtype(), "kaiser_window_cpu", [&](){

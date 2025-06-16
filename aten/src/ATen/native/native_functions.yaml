@@ -3310,6 +3310,13 @@
     SparseCPU, SparseCUDA: nan_to_num_sparse_out
   tags: pointwise
 
+- func: nan_to_num.complex(Tensor self, float? nan=None, float? posinf=None, float? neginf=None, bool? complex=False) -> Tensor
+  variants: function, method
+  dispatch:
+    CompositeExplicitAutograd: nan_to_num_complex
+    # SparseCPU, SparseCUDA: nan_to_num_sparse
+  tags: pointwise
+
 - func: linear(Tensor input, Tensor weight, Tensor? bias=None) -> Tensor
   python_module: nn
   dispatch:

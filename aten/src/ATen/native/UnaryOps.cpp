@@ -800,11 +800,13 @@ Tensor special_expit(const Tensor& self) {
   return self.sigmoid();
 }
 
+
 Tensor& nan_to_num_out(const Tensor& self,
     std::optional<double> nan,
     std::optional<double> pos_inf,
     std::optional<double> neg_inf,
     Tensor& result) {
+  std::cout << "nan_to_num_out" << std::endl;
   TORCH_CHECK(
       self.scalar_type() == result.scalar_type(),
       "nan_to_num: dtype of out: ",
@@ -831,6 +833,33 @@ Tensor nan_to_num(
   auto result = at::empty_like(self);
   return at::nan_to_num_out(result, self, nan, pos_inf, neg_inf);
 }
+
+Tensor nan_to_num_complex(
+    const Tensor& self,
+    std::optional<double> nan,
+    std::optional<double> pos_inf,
+    std::optional<double> neg_inf,
+    std::optional<bool> complex) {
+  auto result = at::empty_like(self);
+  return at::nan_to_num_out(result, self, nan, pos_inf, neg_inf);
+}
+
+// Tensor nan_to_num2(
+//     const Tensor& self,
+//     std::optional<c10::complex<double>> nan,
+//     std::optional<c10::complex<double>> pos_inf,
+//     std::optional<c10::complex<double>> neg_inf) {
+//   auto result = at::empty_like(self);
+
+//   //c10::complex<double> nan_val = nan.has_value() ? nan.value() : c10::complex<double>(0.0, 0.0);
+//   //c10::complex<double> pos_inf_val = pos_inf.has_value() ? pos_inf.value() : c10::complex<double>(INFINITY, INFINITY);
+//   //c10::complex<double> neg_inf_val = neg_inf.has_value() ? neg_inf.value() : c10::complex<double>(-INFINITY, -INFINITY); 
+//   double nan_val = 0.0;
+//   double pos_inf_val = INFINITY;
+//   double neg_inf_val = -INFINITY;
+
+//   return at::nan_to_num_out(result, self, nan_val, pos_inf_val, neg_inf_val);
+// }
 
 Tensor& nan_to_num_(
     Tensor& self,

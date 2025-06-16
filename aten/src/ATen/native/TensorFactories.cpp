@@ -1080,7 +1080,8 @@ Tensor randn_like(
 
 namespace {
 template <typename scalar_t>
-void randperm_cpu(Tensor& result, int64_t n, CPUGeneratorImpl* generator) {
+void randperm_cpu(Tensor& result, int64_t n, CPUGeneratorImpl* generator, bool disallow_identity_mappings = false) {
+  std::cout << "Randperm_cpu function" << std::endl;
   scalar_t *r__data = result.data_ptr<scalar_t>();
 
   result.resize_({n});
